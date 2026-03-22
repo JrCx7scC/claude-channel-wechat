@@ -17,29 +17,16 @@
 
 ## 安装
 
-**1. 注册 marketplace**
+**1. 添加 marketplace**
 
-在 `~/.claude/settings.json` 的 `extraKnownMarketplaces` 中加入：
-
-```jsonc
-{
-  "extraKnownMarketplaces": {
-    "claude-channel-wechat": {
-      "source": {
-        "source": "github",
-        "repo": "JrCx7scC/claude-channel-wechat"
-      }
-    }
-  }
-}
+```bash
+claude plugin marketplace add JrCx7scC/claude-channel-wechat
 ```
 
 **2. 安装插件**
 
-在 Claude Code 中执行：
-
-```
-/plugin install wechat@claude-channel-wechat
+```bash
+claude plugin install wechat@claude-channel-wechat
 ```
 
 **3. 启动**
