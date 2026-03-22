@@ -17,14 +17,9 @@
 
 ## 安装
 
-### 方式一：Plugin 安装（推荐，支持 `/wechat:configure` 命令）
+**1. 注册 marketplace**
 
-```bash
-# 1. 注册 marketplace（只需一次）
-# 在 ~/.claude/settings.json 的 extraKnownMarketplaces 中添加：
-```
-
-在 `~/.claude/settings.json` 中加入：
+在 `~/.claude/settings.json` 的 `extraKnownMarketplaces` 中加入：
 
 ```jsonc
 {
@@ -39,59 +34,25 @@
 }
 ```
 
-然后在 Claude Code 中执行：
+**2. 安装插件**
+
+在 Claude Code 中执行：
 
 ```
 /plugin install wechat@claude-channel-wechat
 ```
 
-启动：
+**3. 启动**
 
 ```bash
 claude --dangerously-load-development-channels plugin:wechat@claude-channel-wechat
 ```
 
+**4. 扫码连接**
+
 在 Claude Code 中输入 `/wechat:configure`，终端弹出二维码，微信扫一下就连上了。
 
-### 方式二：裸 MCP Server（更简单，无 skill 支持）
-
-```bash
-# 1. 克隆
-git clone https://github.com/JrCx7scC/claude-channel-wechat.git
-cd claude-channel-wechat
-bun install
-
-# 2. 在 ~/.claude.json 的 mcpServers 中添加：
-```
-
-```json
-{
-  "mcpServers": {
-    "wechat": {
-      "type": "stdio",
-      "command": "bun",
-      "args": ["/你的路径/claude-channel-wechat/server.ts"]
-    }
-  }
-}
-```
-
-```bash
-# 3. 扫码登录（首次）
-bun test-login.ts
-
-# 4. 启动
-claude --dangerously-load-development-channels server:wechat
-```
-
 ## 使用
-
-### 扫码登录
-
-- **Plugin 方式**：在 Claude Code 中输入 `/wechat:configure`
-- **裸 MCP 方式**：运行 `bun test-login.ts`
-
-终端弹出二维码 → 微信扫码 → 确认连接 → 完成。凭证保存在 `~/.claude/channels/wechat/account.json`。
 
 ### 发消息
 
@@ -111,9 +72,8 @@ Session 过期后需要重新扫码：
 # 删除旧凭证
 rm ~/.claude/channels/wechat/account.json
 
-# 重新扫码
-# Plugin: /wechat:configure
-# 裸 MCP: bun test-login.ts
+# 在 Claude Code 中重新扫码
+/wechat:configure
 ```
 
 ## 工作原理
