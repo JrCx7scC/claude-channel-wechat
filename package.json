@@ -1,0 +1,16 @@
+{
+  "name": "claude-channel-wechat",
+  "version": "0.0.1",
+  "description": "WeChat channel for Claude Code — bridges WeChat messages via Tencent iLink Bot API",
+  "license": "MIT",
+  "type": "module",
+  "bin": "./server.ts",
+  "scripts": {
+    "start": "bun install --no-summary && bun server.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

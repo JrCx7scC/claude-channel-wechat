@@ -1,0 +1,15 @@
+{
+  "name": "claude-channel-wechat",
+  "owner": {
+    "name": "Jax",
+    "url": "https://github.com/jaxonly"
+  },
+  "plugins": [
+    {
+      "name": "wechat",
+      "source": "./",
+      "description": "WeChat channel for Claude Code — bridges WeChat messages via Tencent iLink Bot API. Scan QR code to connect, no OpenClaw needed.",
+      "version": "0.0.1"
+    }
+  ]
+}
