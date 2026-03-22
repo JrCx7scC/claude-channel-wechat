@@ -1,88 +1,169 @@
 # claude-channel-wechat
 
-微信 Channel for Claude Code — 通过腾讯 iLink Bot API 将微信消息桥接到 Claude Code 会话。
-
-## 架构
+用微信控制 Claude Code。扫码即用，不需要 OpenClaw。
 
 ```
-微信用户 → 腾讯 iLink API → 本地 MCP Server (long-poll) → Claude Code Session
-                          ← sendMessage                  ← reply tool
+微信 → 腾讯 iLink API → MCP Server (long-poll) → Claude Code
+                      ← sendMessage              ← reply tool
 ```
 
-**无需 OpenClaw。** 直接使用腾讯的 iLink Bot API (`ilinkai.weixin.qq.com`)。
+底层直接调用腾讯的 iLink Bot API（`ilinkai.weixin.qq.com`），689 行代码，一个文件。
+
+## 前提
+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) v2.1.80+（需要 claude.ai 登录，不支持 API key）
+- [Bun](https://bun.sh) 运行时
+- 微信（iOS / Android / Mac / Windows 均可扫码）
 
 ## 安装
 
-```bash
-# 1. 确保已安装 Bun
-curl -fsSL https://bun.sh/install | bash
+### 方式一：Plugin 安装（推荐，支持 `/wechat:configure` 命令）
 
-# 2. 克隆/下载本项目
+```bash
+# 1. 注册 marketplace（只需一次）
+# 在 ~/.claude/settings.json 的 extraKnownMarketplaces 中添加：
+```
+
+在 `~/.claude/settings.json` 中加入：
+
+```jsonc
+{
+  "extraKnownMarketplaces": {
+    "claude-channel-wechat": {
+      "source": {
+        "source": "github",
+        "repo": "JrCx7scC/claude-channel-wechat"
+      }
+    }
+  }
+}
+```
+
+然后在 Claude Code 中执行：
+
+```
+/plugin install wechat@claude-channel-wechat
+```
+
+启动：
+
+```bash
+claude --dangerously-load-development-channels plugin:wechat@claude-channel-wechat
+```
+
+在 Claude Code 中输入 `/wechat:configure`，终端弹出二维码，微信扫一下就连上了。
+
+### 方式二：裸 MCP Server（更简单，无 skill 支持）
+
+```bash
+# 1. 克隆
+git clone https://github.com/JrCx7scC/claude-channel-wechat.git
 cd claude-channel-wechat
 bun install
 
-# 3. 添加到 Claude Code MCP 配置
-# 在 ~/.claude.json 或项目 .mcp.json 中添加：
+# 2. 在 ~/.claude.json 的 mcpServers 中添加：
 ```
 
 ```json
 {
   "mcpServers": {
     "wechat": {
+      "type": "stdio",
       "command": "bun",
-      "args": ["/path/to/claude-channel-wechat/server.ts"]
+      "args": ["/你的路径/claude-channel-wechat/server.ts"]
     }
   }
 }
 ```
 
-## 使用
-
 ```bash
-# 启动（首次会显示二维码，用微信扫描登录）
+# 3. 扫码登录（首次）
+bun test-login.ts
+
+# 4. 启动
 claude --dangerously-load-development-channels server:wechat
 ```
 
-1. 终端显示二维码 → 用微信扫描
-2. 扫码登录的微信账号自动加入白名单
-3. 其他人给你发消息 → 收到配对码 → 在终端执行 `/wechat:access pair <code>` 批准
-4. 批准后的用户消息会转发到 Claude Code 会话
+## 使用
 
-## 访问控制
+### 扫码登录
+
+- **Plugin 方式**：在 Claude Code 中输入 `/wechat:configure`
+- **裸 MCP 方式**：运行 `bun test-login.ts`
+
+终端弹出二维码 → 微信扫码 → 确认连接 → 完成。凭证保存在 `~/.claude/channels/wechat/account.json`。
+
+### 发消息
+
+登录后，在微信里给 ClawBot 发消息，Claude Code 会实时收到并处理。Claude 通过 `reply` 工具回复，消息会出现在你的微信对话里。
+
+```
+你（微信）: 帮我看看 main.py 有没有 bug
+Claude Code: [读取文件、分析代码、通过 reply 工具回复]
+你（微信）: 收到 Claude 的分析结果
+```
+
+### 重新登录
+
+Session 过期后需要重新扫码：
 
 ```bash
-# 在 Claude Code 中执行
-/wechat:access pair <code>        # 批准配对
-/wechat:access list               # 查看白名单
-/wechat:access add <userId>       # 手动添加
-/wechat:access remove <userId>    # 移除
-/wechat:access policy allowlist   # 锁定（不再接受新配对）
+# 删除旧凭证
+rm ~/.claude/channels/wechat/account.json
+
+# 重新扫码
+# Plugin: /wechat:configure
+# 裸 MCP: bun test-login.ts
 ```
+
+## 工作原理
+
+逆向了腾讯的 `@tencent-weixin/openclaw-weixin` 插件，发现底层是 6 个 HTTP API：
+
+| API | 功能 |
+|-----|------|
+| `ilink/bot/get_bot_qrcode` | 获取登录二维码 |
+| `ilink/bot/get_qrcode_status` | 轮询扫码状态 |
+| `ilink/bot/getupdates` | 长轮询收消息（35s 超时） |
+| `ilink/bot/sendmessage` | 发送消息 |
+| `ilink/bot/sendtyping` | 打字状态指示 |
+| `ilink/bot/getconfig` | 获取 typing ticket |
+
+整个 OpenClaw 只是在这 6 个 API 上套了一层路由壳子。我们直接调用 iLink API，用 MCP 协议桥接到 Claude Code。
+
+### 认证模型
+
+跟 Telegram Channel 完全不同：
+
+| | Telegram | WeChat |
+|---|---|---|
+| 认证 | BotFather token + 6字符配对码 | **微信扫码即认证** |
+| Access 控制 | pairing/allowlist/open | 不需要 |
+| 原因 | Bot 是公开的，谁都能发消息 | 扫码本身就是身份验证 |
+
+所以 WeChat 版比 Telegram 版少了近 100 行代码（689 vs 780），因为整个 access control 层不需要了。
 
 ## 状态文件
 
 ```
 ~/.claude/channels/wechat/
-├── account.json     # 登录凭证（bot token, base URL）
-├── access.json      # 访问控制（白名单、待配对）
-├── sync-buf.txt     # 消息同步游标
-└── approved/        # 配对批准信号文件
+├── account.json     # 登录凭证（bot token, base URL, bot ID）
+└── sync-buf.txt     # 消息同步游标（断点续传）
 ```
-
-## 工作原理
-
-- **登录**: 调用 `ilink/bot/get_bot_qrcode` 获取二维码，用户扫码后获得 `bot_token`
-- **收消息**: 长轮询 `ilink/bot/getupdates`，35秒超时
-- **发消息**: POST `ilink/bot/sendmessage`，需要 `context_token`（从收到的消息中提取）
-- **打字状态**: `ilink/bot/sendtyping`，需要 `typing_ticket`（从 `getconfig` 获取）
-- **Session 过期**: errcode -14 时需要重新扫码登录
 
 ## 限制
 
-- 不支持图片/文件发送（当前仅文本）
-- 微信 Bot API 没有消息历史/搜索
-- Session 可能过期，需要重新扫码
-- `context_token` 是按消息发放的，用户必须先发消息才能收到回复
+- **权限审批仍需在电脑上**：Claude Code 改文件、跑命令需要在终端点同意，Channel 解决不了这个问题
+- **仅文本消息**：当前不支持图片/文件发送
+- **无消息历史**：iLink API 没有搜索和历史功能，只能看实时消息
+- **Session 会过期**：需要重新扫码（errcode -14）
+- **需要先收到消息**：`context_token` 是按消息发放的，用户必须先发消息 Claude 才能回复
+
+## 它是什么 / 不是什么
+
+**是**：远程终端的通知系统。你能在微信里看到 Claude 在干什么、卡在哪里。
+
+**不是**：聊天机器人。它不是微信版 ChatGPT，它是你电脑上 Claude Code 的远程窗口。
 
 ## License
 
